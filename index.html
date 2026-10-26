@@ -42,9 +42,7 @@ body::after{
 </head>
 <body>
 <svg id="s" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-  <defs>
-    <linearGradient id="gY" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#eaa20a"/><stop offset=".5" stop-color="#f7c40c"/><stop offset="1" stop-color="#fbd41c"/></linearGradient>
-    <linearGradient id="gO" x1="0" y1="1" x2="0" y2="0"><stop offset=".5" stop-color="#f7c40c"/><stop offset="1" stop-color="#ee7f16"/></linearGradient>
+  <defs id="defs">
     <!-- centre crease: one side catches light, the other falls away -->
     <linearGradient id="crease" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".49" stop-color="#fff" stop-opacity=".08"/>
@@ -65,20 +63,99 @@ body::after{
       <feDropShadow in="t" dx=".6" dy="1.6" stdDeviation="1.3" flood-color="#3a2a10" flood-opacity=".3"/>
     </filter>
   </defs>
-  <g filter="url(#cut)"><path id="stem" class="stem" pathLength="1" fill="none" stroke="#d4141c" stroke-width="9" stroke-linecap="round"/></g>
+  <g filter="url(#cut)"><path id="stem" class="stem" pathLength="1" fill="none" stroke-width="9" stroke-linecap="round"/></g>
   <g id="flower" transform="translate(195 422)"></g>
 </svg>
 <script>
-let seed=5;
+// petal shapes: half-width w, length l, base at the centre, tip pointing up
+const SH={
+  strip:(w,l)=>`M${-w} ${-l*.22}h${2*w}v${-l*.78}h${-2*w}Z`,
+  round:(w,l)=>`M${-w*.4} 0C${-w*1.2} ${-l*.3} ${-w*1.1} ${-l*.85} 0 ${-l}C${w*1.1} ${-l*.85} ${w*1.2} ${-l*.3} ${w*.4} 0Z`,
+  spike:(w,l)=>`M${-w*.4} 0L${-w} ${-l*.9}L${w*.5} ${-l}L${w} ${-l*.88}L${w*.4} 0Z`,
+  heart:(w,l)=>`M${-w*.3} 0L${-w} ${-l*.5}L0 ${-l}L${w} ${-l*.5}L${w*.3} 0Z`,
+  tear:(w,l)=>`M0 0C${-w*1.4} ${-l*.35} ${-w*.6} ${-l*.8} 0 ${-l}C${w*.6} ${-l*.8} ${w*1.4} ${-l*.35} 0 0Z`,
+  spoon:(w,l)=>`M${-w*.15} 0L${-w*.3} ${-l*.6}C${-w*1.2} ${-l*.65} ${-w*1.1} ${-l} 0 ${-l}C${w*1.1} ${-l} ${w*1.2} ${-l*.65} ${w*.3} ${-l*.6}L${w*.15} 0Z`,
+  notch:(w,l)=>`M${-w*.3} 0L${-w} ${-l*.85}L${-w*.5} ${-l}L0 ${-l*.88}L${w*.5} ${-l}L${w} ${-l*.85}L${w*.3} 0Z`,
+};
+// a colour is a hex, or an array of stops running base -> tip
+const GY=['#eaa20a','#f7c40c','#fbd41c'],GO=['#f7c40c','#f7c40c','#ee7f16'];
+// layer: [shape, count, length range, width range (× radius), colours, crease, boil period, boil swing, angle jitter, extra {tip:[chance,colours], rot}]
+const V=[
+  {name:'sunflower',rad:182,stem:'#d4141c',sx:262,eye:[4,'#e07a12'],L:[
+    ['strip',96,[.8,1],[.006,.013],['#c8921a','#b8820e','#dca41c','#cf9a14'],0,.47,1.1,3],
+    ['round',17,[.6,.9],[.05,.08],['#cdb52a','#c2a822','#d4c036'],1,.53,-1.4,8],
+    ['spike',60,[.5,.95],[.02,.05],[GY,'#f7c40c','#fbd41c'],1,.43,.9,5,{tip:[.3,[GO]]}],
+    ['heart',26,[.28,.5],[.02,.04],['#fde25a','#f9d33a','#fcdc4a'],1,.5,-.7,6]]},
+  {name:'poppy',rad:165,stem:'#1f5c3a',sx:130,eye:[9,'#141018'],L:[
+    ['round',7,[.85,1],[.17,.22],['#e8321e','#d9241a','#f0452a'],1,.55,1.2,10],
+    ['round',6,[.6,.8],[.14,.18],['#c81a14','#e02a1c'],1,.49,-1,12,{rot:30}],
+    ['strip',70,[.18,.3],[.004,.008],['#1a1414','#2a1d1d'],0,.45,.8,4]]},
+  {name:'daisy',rad:175,stem:'#3d8a3a',sx:300,eye:[10,'#e6a00c'],L:[
+    ['spoon',34,[.8,1],[.05,.07],['#ffffff','#fbf8ef','#f4f1e8'],1,.5,1,3],
+    ['spoon',22,[.65,.8],[.045,.06],['#f6f2e6','#ffffff'],1,.44,-1.1,6],
+    ['heart',40,[.15,.24],[.02,.035],['#f7c40c','#eaa20a','#fbd41c'],1,.47,.8,5]]},
+  {name:'cornflower',rad:170,stem:'#5b7f3a',sx:120,eye:[6,'#1a0f33'],L:[
+    ['notch',28,[.7,1],[.04,.06],['#2b5fd9','#3a6ee6','#1f4cc4'],1,.5,1.2,6,{tip:[.4,[['#1f4cc4','#2b5fd9','#7aa0ff']]]}],
+    ['strip',60,[.4,.65],[.006,.012],['#5a2a9a','#6b36b0','#3b1f78'],0,.43,-.9,4],
+    ['heart',18,[.15,.25],[.02,.035],['#2a1650','#3b1f78'],1,.53,.7,6]]},
+  {name:'dahlia',rad:178,stem:'#2f6b2a',sx:250,eye:[5,'#e0457a'],L:[
+    ['spoon',24,[.85,1],[.06,.08],['#f27ba3','#ee6a96'],1,.52,1.1,5],
+    ['spoon',24,[.68,.82],[.055,.07],['#f590b4','#f7a1c0'],1,.46,-1.2,7,{rot:7}],
+    ['spoon',20,[.48,.62],[.05,.065],['#f9b6cf','#fbc6da'],1,.5,.9,8],
+    ['spoon',14,[.26,.38],[.045,.06],['#fdd8e6','#ffe6ef'],1,.44,-.8,10,{rot:12}]]},
+  {name:'chrysanthemum',rad:186,stem:'#1d4d2a',sx:280,eye:[3,'#c2410c'],L:[
+    ['spike',120,[.75,1],[.012,.025],[['#d9480f','#f7931e'],'#ee6a12','#f58a1a'],1,.45,1,3],
+    ['spike',80,[.5,.75],[.012,.024],['#f7a81e','#f9b934',['#ee7f16','#fbd41c']],1,.51,-1.1,4],
+    ['spike',50,[.25,.45],[.01,.02],['#fcd34a','#fde25a'],1,.42,.8,6]]},
+  {name:'violet star',rad:172,stem:'#d4141c',sx:110,eye:[5,'#ee7f16'],L:[
+    ['strip',72,[.85,1],[.005,.01],['#c9a6f0','#b590e8','#d9bff7'],0,.49,1,3],
+    ['tear',6,[.8,.95],[.16,.2],['#7b3fd1','#6a2fc0','#8a4ee0'],1,.55,-1.3,4],
+    ['tear',6,[.5,.62],[.12,.15],[['#5a20a8','#c08af5']],1,.45,1,4,{rot:30}],
+    ['heart',12,[.14,.22],[.02,.03],['#fbd41c','#f7c40c'],1,.5,-.7,6]]},
+  {name:'ladybird',rad:170,stem:'#1a1414',sx:240,eye:[5,'#f7c40c'],L:[
+    ['round',9,[.85,1],[.13,.17],['#1a1414','#241b1b'],1,.52,1.2,6],
+    ['spike',36,[.55,.8],[.02,.035],['#d4141c','#e8321e'],1,.46,-1,4,{rot:5,tip:[.5,[['#d4141c','#d4141c','#f7c40c']]]}],
+    ['heart',20,[.18,.28],[.02,.035],['#d4141c','#c0101a'],1,.5,.8,6]]},
+  {name:'mint',rad:176,stem:'#ee7f16',sx:145,eye:[6,'#d4141c'],L:[
+    ['strip',84,[.82,1],[.006,.012],['#2a9d8f','#238a7e','#33b0a0'],0,.47,1,3],
+    ['tear',12,[.65,.9],[.09,.12],['#7fd6c2',['#3fb8a5','#c8f2e6']],1,.53,-1.2,6],
+    ['spike',30,[.35,.55],[.02,.035],['#f27ba3','#f590b4'],1,.44,.9,5,{tip:[.4,[['#f27ba3','#d4141c']]]}]]},
+  {name:'gerbera',rad:180,stem:'#2f6b2a',sx:290,eye:[8,'#2a180a'],L:[
+    ['round',28,[.85,1],[.035,.05],['#ff8a65','#ff7a52',['#ff6a3d','#ffb08f']],1,.5,1.1,3],
+    ['round',26,[.6,.75],[.03,.045],['#ffa384','#ff9670'],1,.44,-1,4,{rot:7}],
+    ['strip',80,[.22,.34],[.004,.008],['#f7c40c','#eaa20a'],0,.47,.8,3],
+    ['heart',16,[.1,.16],[.02,.03],['#3b2410','#5a3618'],1,.52,-.6,6]]},
+];
+
+// #3 in the address picks a flower; otherwise random, never the same twice in a row
+let v=parseInt(location.hash.slice(1));
+if(!(v>=0&&v<V.length)){
+  let last=-1;try{last=+localStorage.flower}catch(e){}
+  do v=Math.floor(Math.random()*V.length);while(v===last);
+}
+try{localStorage.flower=v}catch(e){}
+const FL=V[v];
+
+let seed=5+v*1013;
 const R=()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
 const r=(a,b)=>a+R()*(b-a),pick=a=>a[Math.floor(R()*a.length)];
 const NS='http://www.w3.org/2000/svg';
 const E=(t,at,p)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);p&&p.append(e);return e};
 
-// stem rises from below the page and ends in the flower's centre
-document.getElementById('stem').setAttribute('d','M262 870Q214 660 195 422');
+const defs=document.getElementById('defs');let gi=0;
+const paint=c=>{
+  if(typeof c==='string')return c;
+  const g=E('linearGradient',{id:'g'+gi,x1:0,y1:1,x2:0,y2:0},defs);
+  c.forEach((s,i)=>E('stop',{offset:i/(c.length-1),'stop-color':s},g));
+  return `url(#g${gi++})`;
+};
 
-const F=document.getElementById('flower'),RAD=182,T=1.7,CLOSED=-8; // CLOSED: bud points on from the stem
+// stem rises from below the page and ends in the flower's centre
+const stem=document.getElementById('stem');
+stem.setAttribute('d',`M${FL.sx} 870Q${195+(FL.sx-195)*.28} 660 195 422`);
+stem.setAttribute('stroke',FL.stem);
+
+const F=document.getElementById('flower'),RAD=FL.rad,T=1.7,CLOSED=-8; // CLOSED: bud points on from the stem
 const layer=(p,w)=>E('g',{class:'boil',style:`--p:${p}s;--w:${w}deg`},F);
 const wrap=g=>E('g',{filter:'url(#cut)'},g);
 const norm=a=>((a+180)%360+360)%360-180;
@@ -88,31 +165,14 @@ const strip=(g,d,ang,fill,op,len,crease)=>{
   if(crease)E('path',{d,fill:'url(#crease)'},el);
 };
 
-// 1 fringe: thin flat-cut gold strips, the outer halo
-let L=wrap(layer(.47,1.1));
-for(let i=0,n=96;i<n;i++){
-  const l=RAD*r(.8,1),w=r(1.1,2.4);
-  strip(L,`M${-w} ${-l*.22}h${2*w}v${-l*.78}h${-2*w}Z`,i*360/n+r(-3,3),pick(['#c8921a','#b8820e','#dca41c','#cf9a14']),r(.85,1),l,false);
+for(const [sh,n,len,wid,cols,crease,p,sw,jit,x={}] of FL.L){
+  const L=wrap(layer(p,sw)),cs=cols.map(paint),tip=x.tip&&[x.tip[0],x.tip[1].map(paint)];
+  for(let i=0;i<n;i++){
+    const l=RAD*r(...len),w=RAD*r(...wid);
+    strip(L,SH[sh](w,l),i*360/n+(x.rot||0)+r(-jit,jit),tip&&R()<tip[0]?pick(tip[1]):pick(cs),r(.88,1),l,crease);
+  }
 }
-// 2 wide rounded olive petals
-L=wrap(layer(.53,-1.4));
-for(let i=0,n=17;i<n;i++){
-  const l=RAD*r(.6,.9),w=RAD*r(.05,.08);
-  strip(L,`M${-w*.4} 0C${-w*1.2} ${-l*.3} ${-w*1.1} ${-l*.85} 0 ${-l}C${w*1.1} ${-l*.85} ${w*1.2} ${-l*.3} ${w*.4} 0Z`,i*360/n+r(-8,8),pick(['#cdb52a','#c2a822','#d4c036']),r(.92,1),l,true);
-}
-// 3 long bright strips, some with orange tips
-L=wrap(layer(.43,.9));
-for(let i=0,n=60;i<n;i++){
-  const l=RAD*r(.5,.95),w=RAD*r(.02,.05);
-  strip(L,`M${-w*.4} 0L${-w} ${-l*.9}L${w*.5} ${-l}L${w} ${-l*.88}L${w*.4} 0Z`,i*360/n+r(-5,5),R()<.3?'url(#gO)':pick(['url(#gY)','#f7c40c','#fbd41c']),r(.9,1),l,true);
-}
-// 4 short inner strips, the pale heart
-L=wrap(layer(.5,-.7));
-for(let i=0,n=26;i<n;i++){
-  const l=RAD*r(.28,.5),w=RAD*r(.02,.04);
-  strip(L,`M${-w*.3} 0L${-w} ${-l*.5}L0 ${-l}L${w} ${-l*.5}L${w*.3} 0Z`,i*360/n+r(-6,6),pick(['#fde25a','#f9d33a','#fcdc4a']),r(.9,1),l,true);
-}
-E('circle',{r:4,fill:'#e07a12'},F);
+E('circle',{r:FL.eye[0],fill:FL.eye[1]},F);
 
 document.addEventListener('click',()=>location.reload());
 </script>
